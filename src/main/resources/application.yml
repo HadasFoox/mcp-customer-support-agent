@@ -1,0 +1,37 @@
+spring:
+  # Optionally load secrets from a local, gitignored .env (properties format).
+  # Missing file is ignored ("optional:"). A real OS env var still takes precedence.
+  config:
+    import: "optional:file:.env[.properties]"
+  main:
+    banner-mode: "off"          # stdout is reserved for JSON-RPC frames
+    web-application-type: none
+  ai:
+    mcp:
+      server:
+        stdio: true
+        type: SYNC
+        name: cheq-support-mcp
+        version: 0.0.1
+    # Single provider: the OpenAI client pointed at Google Gemini's OpenAI-compatible
+    # endpoint. One GEMINI_API_KEY drives both chat and embeddings; no Vertex/GCP needed.
+    openai:
+      api-key: ${GEMINI_API_KEY}
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai
+      chat:
+        options:
+          model: gemini-2.5-flash
+      embedding:
+        options:
+          model: gemini-embedding-001
+
+support:
+  dataset:
+    # The CSV is cloned locally once (git clone of the HF dataset); the server only reads it.
+    path: ${DATASET_PATH:data/customer-support-tickets/dataset-tickets-multi-lang-4-20k.csv}
+  ingest:
+    max-rows: ${INGEST_MAX_ROWS:750}   # cap embedding cost/time on first run
+  vectorstore:
+    path: ${VECTORSTORE_PATH:vectorstore.json}
+  sqlite:
+    path: ${SQLITE_PATH:support.sqlite}

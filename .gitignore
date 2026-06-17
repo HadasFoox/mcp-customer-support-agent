@@ -2,3 +2,22 @@
 node_modules/
 .env
 .env.local
+
+# Java / Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Runtime artifacts (logs reserved off stdout; built store/vectors)
+logs/
+*.sqlite
+*.db
+vectorstore.json
+
+# Local dataset (cloned manually, not committed)
+data/
+
+# IDE
+.idea/
+*.iml
+.vscode/

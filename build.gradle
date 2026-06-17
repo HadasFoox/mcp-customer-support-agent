@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.cheq.support'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    // mavenCentral only — no milestone/snapshot repositories (locked decision #1)
+    mavenCentral()
+}
+
+ext {
+    // Spring AI 1.0.1 GA (baseline: Spring Boot 3.4.x)
+    springAiVersion = '1.0.1'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+
+    // MCP server over STDIO (registers @Tool beans via MethodToolCallbackProvider)
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server'
+
+    // Single model provider: the OpenAI starter pointed at Google Gemini's
+    // OpenAI-compatible endpoint — one starter + one API key for BOTH chat and embeddings.
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+
+    // Embedded SQLite store (portable; no native vector extensions) + CSV ingest
+    implementation 'org.xerial:sqlite-jdbc:3.53.2.0'
+    implementation 'org.apache.commons:commons-csv:1.14.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
