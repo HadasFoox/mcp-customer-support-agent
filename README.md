@@ -55,49 +55,16 @@ Or export them in your shell before running.
 
 ---
 
-## 2 — Build
+## 2 — Connect to Claude Desktop
 
-```bash
-./gradlew bootJar
-# produces build/libs/mcp-customer-support-agent-0.0.1-SNAPSHOT.jar
-```
-
----
-
-## 3 — Run standalone (smoke test)
-
-The server speaks JSON-RPC over STDIO so it has no HTTP port to hit. You can verify startup by watching the log:
-
-```bash
-java -jar build/libs/mcp-customer-support-agent-0.0.1-SNAPSHOT.jar
-tail -f logs/mcp.log
-```
-
-On first run (cold start):
-```
-Cold start complete: ingested 750 tickets, embedded 1500 documents, saved to vectorstore.json.
-```
-
-On subsequent runs (warm start — no embedding API calls):
-```
-Warm start: SQLite populated (750 tickets) and vectorstore.json loaded — no embedding calls.
-```
-
----
-
-## 4 — Connect to Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+No manual build step needed. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "cheq-support": {
-      "command": "java",
-      "args": [
-        "-jar",
-        "/absolute/path/to/mcp-customer-support-agent-0.0.1-SNAPSHOT.jar"
-      ],
+      "command": "/absolute/path/to/repo/gradlew",
+      "args": ["bootRun"],
       "env": {
         "GEMINI_API_KEY": "your-key-here"
       }
@@ -106,7 +73,15 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The tool `analyze_support_tickets` will appear in the tool list.
+Replace `/absolute/path/to/repo` with the actual path where you cloned this repo.  
+Restart Claude Desktop — `analyze_support_tickets` will appear in the tool list.
+
+**On first use (cold start)** the server embeds 750 tickets before accepting queries (~30–60 s depending on Gemini API latency). Watch progress in `logs/mcp.log`:
+```
+Cold start complete: ingested 750 tickets, embedded 1500 documents, saved to vectorstore.json.
+```
+
+Subsequent restarts load from disk instantly (warm start — zero embedding calls).
 
 **Example prompts:**
 - *"What are the most common issues in the Technical Support queue?"*
@@ -115,7 +90,16 @@ Restart Claude Desktop. The tool `analyze_support_tickets` will appear in the to
 
 ---
 
-## 5 — Run tests
+## 3 — Run tests
+
+**Example prompts:**
+- *"What are the most common issues in the Technical Support queue?"*
+- *"Summarize billing complaints from German-speaking customers."*
+- *"Which app versions generate the most high-priority incidents?"*
+
+---
+
+## 4 — Run tests
 
 ```bash
 ./gradlew test
