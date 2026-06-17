@@ -14,9 +14,6 @@ logs/
 *.db
 vectorstore.json
 
-# Local dataset (cloned manually, not committed)
-data/
-
 # IDE
 .idea/
 *.iml
