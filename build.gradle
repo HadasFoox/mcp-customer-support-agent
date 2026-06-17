@@ -39,6 +39,9 @@ dependencies {
     // OpenAI-compatible endpoint — one starter + one API key for BOTH chat and embeddings.
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
+    // In-memory vector store (SimpleVectorStore) + filter expression support
+    implementation 'org.springframework.ai:spring-ai-vector-store'
+
     // Embedded SQLite store (portable; no native vector extensions) + CSV ingest
     implementation 'org.xerial:sqlite-jdbc:3.53.2.0'
     implementation 'org.apache.commons:commons-csv:1.14.1'
