@@ -6,6 +6,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Entry point for the CHEQ support-ticket analysis MCP server.
@@ -24,7 +25,7 @@ public class McpSupportServerApplication {
     }
 
     @Bean
-    public MethodToolCallbackProvider toolCallbackProvider(SupportAnalysisTool tool) {
+    public MethodToolCallbackProvider toolCallbackProvider(@Lazy SupportAnalysisTool tool) {
         return MethodToolCallbackProvider.builder().toolObjects(tool).build();
     }
 }
