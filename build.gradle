@@ -59,3 +59,9 @@ bootRun {
     // doesn't get immediate EOF and shut down before ingestion can run.
     standardInput = System.in
 }
+
+processResources {
+    // Exclude large pre-seeded data files from the JAR — they are loaded directly
+    // from the source tree at runtime, keeping the fat JAR lean (~37 MB vs ~99 MB).
+    exclude 'vectorstore.json', 'support.sqlite'
+}

@@ -27,11 +27,10 @@ spring:
 
 support:
   dataset:
-    # The CSV is cloned locally once (git clone of the HF dataset); the server only reads it.
     path: ${DATASET_PATH:data/customer-support-tickets/dataset-tickets-multi-lang-4-20k.csv}
   ingest:
     max-rows: ${INGEST_MAX_ROWS:750}   # cap embedding cost/time on first run
   vectorstore:
-    path: ${VECTORSTORE_PATH:vectorstore.json}
+    path: ${VECTORSTORE_PATH:src/main/resources/vectorstore.json}
   sqlite:
-    path: ${SQLITE_PATH:support.sqlite}
+    path: ${SQLITE_PATH:src/main/resources/support.sqlite}
