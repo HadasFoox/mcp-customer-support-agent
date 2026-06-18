@@ -10,9 +10,7 @@ build/
 
 # Runtime artifacts (logs reserved off stdout; built store/vectors)
 logs/
-*.sqlite
 *.db
-vectorstore.json
 
 # IDE
 .idea/

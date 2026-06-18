@@ -73,10 +73,15 @@ public class IngestionService {
     public void ingest() {
         // Run in a background thread so the server starts instantly and the MCP
         // handshake completes before any long-running embedding work begins.
-        Thread.ofVirtual().name("ingestion").start(this::doIngest);
+        Thread.ofVirtual()
+                .name("ingestion")
+                .uncaughtExceptionHandler((t, e) -> log.error("Ingestion thread died unexpectedly", e))
+                .start(this::doIngest);
     }
 
     void doIngest() {
+        log.info("Ingestion thread started. SQLite populated={}, vectorstore exists={}",
+                reader.isPopulated(), new File(vectorStorePath).exists());
         File vectorFile = new File(vectorStorePath);
 
         if (reader.isPopulated() && vectorFile.exists()) {
@@ -104,7 +109,8 @@ public class IngestionService {
             writer.insertBatch(tickets);
 
             List<Document> documents = toDocuments(tickets);
-            vectorStore.add(documents);
+            log.info("Starting embedding: {} documents to embed ({} tickets × 2 fields).", documents.size(), tickets.size());
+            embedWithProgress(documents);
             vectorStore.save(vectorFile);
 
             readiness.markReady();
@@ -114,6 +120,18 @@ public class IngestionService {
             log.error("Ingestion failed reading CSV at {}: {}", datasetPath, e.getMessage(), e);
         } catch (Exception e) {
             log.error("Ingestion failed (embedding or storage error): {}", e.getMessage(), e);
+        }
+    }
+
+    /** Embed in batches of 50, logging progress every batch. */
+    private void embedWithProgress(List<Document> documents) {
+        int total = documents.size();
+        int batchSize = 50;
+        for (int i = 0; i < total; i += batchSize) {
+            List<Document> batch = documents.subList(i, Math.min(i + batchSize, total));
+            vectorStore.add(batch);
+            log.info("Embedding progress: {}/{} documents ({} %)",
+                    Math.min(i + batchSize, total), total, 100 * Math.min(i + batchSize, total) / total);
         }
     }
 

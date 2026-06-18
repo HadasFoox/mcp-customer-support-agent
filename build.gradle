@@ -53,3 +53,9 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+bootRun {
+    // Pass the terminal's stdin through to the JVM so the MCP stdio transport
+    // doesn't get immediate EOF and shut down before ingestion can run.
+    standardInput = System.in
+}

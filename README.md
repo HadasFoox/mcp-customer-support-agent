@@ -43,15 +43,11 @@ Create a `.env` file in the project root (it is gitignored and loaded automatica
 
 ```properties
 GEMINI_API_KEY=your-key-here
-
-# Optional overrides (defaults shown)
-DATASET_PATH=data/customer-support-tickets/dataset-tickets-multi-lang-4-20k.csv
-SQLITE_PATH=support.sqlite
-VECTORSTORE_PATH=vectorstore.json
-INGEST_MAX_ROWS=750
 ```
 
-Or export them in your shell before running.
+`GEMINI_API_KEY` is the only required variable. It is used for semantic search at query time (not just ingestion). No other variables are needed — the pre-seeded data files are already included in the repo.
+
+Or export the key in your shell before running.
 
 ---
 
@@ -76,12 +72,10 @@ No manual build step needed. Add to `~/Library/Application Support/Claude/claude
 Replace `/absolute/path/to/repo` with the actual path where you cloned this repo.  
 Restart Claude Desktop — `analyze_support_tickets` will appear in the tool list.
 
-**On first use (cold start)** the server embeds 750 tickets before accepting queries (~30–60 s depending on Gemini API latency). Watch progress in `logs/mcp.log`:
+**The repo ships with pre-seeded data** (`support.sqlite` + `vectorstore.json`, 750 tickets). The server loads from disk instantly on every start — no ingestion or CSV download needed. You will see this in `logs/mcp.log`:
 ```
-Cold start complete: ingested 750 tickets, embedded 1500 documents, saved to vectorstore.json.
+Warm start: SQLite populated (750 tickets) and vectorstore.json loaded — no embedding calls.
 ```
-
-Subsequent restarts load from disk instantly (warm start — zero embedding calls).
 
 **Example prompts:**
 - *"What are the most common issues in the Technical Support queue?"*
