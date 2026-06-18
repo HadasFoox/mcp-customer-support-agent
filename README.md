@@ -1,59 +1,90 @@
 # CHEQ MCP Customer Support Agent
 
-A production-grade MCP server that exposes a single tool to Claude Desktop:
+A production-grade MCP server that exposes a single tool to Claude Desktop and Claude Code:
 
 ```
 analyze_support_tickets(business_question: String) → executive report
 ```
 
-All internals — SQL generation, query firewall, SQLite store, vector search, inner LLM — are private. Claude Desktop only sees the one high-level tool.
+All internals — SQL generation, query firewall, SQLite store, vector search, inner LLM — are hidden from the host. The host only sees the one high-level tool.
 
 ---
 
 ## How it works
 
 ```
-Claude Desktop  ──STDIO/JSON-RPC──▶  MCP Server
-                                         │
-                              1. Inner LLM → SQL SELECT
-                              2. Java firewall + read-only SQLite → ticket_ids
-                              3. Semantic search bounded to those ids (SimpleVectorStore)
-                              4. Inner LLM → executive report
+Claude Desktop / Claude Code  ──STDIO/JSON-RPC──▶  MCP Server
+                                                        │
+                                             1. Inner LLM → SQL SELECT
+                                             2. Java firewall + read-only SQLite → ticket_ids
+                                             3. Semantic search bounded to those ids (SimpleVectorStore)
+                                             4. Inner LLM → executive report
 ```
 
-**Guardrails (Java-enforced, never by prompt alone)**
+**Guardrails (Java-enforced, not prompt-based)**
 - SELECT-only; comment stripping; semicolon/stacking rejection
 - Hard `LIMIT 50` cap (cap down only)
 - 3-second JDBC query timeout; read-only SQLite connection
 - Inner reasoning loop capped at 3 iterations
-- Readiness gate — tool refuses until ingestion is complete
+- Readiness gate — tool refuses until data is loaded
 
 ---
 
 ## Prerequisites
 
-- Java 21+
-- A [Gemini API key](https://aistudio.google.com/apikey) (free tier works)
+- **Java 21+** — [Download](https://adoptium.net/)
+- **A Gemini API key** — [Get one free at Google AI Studio](https://aistudio.google.com/apikey)
+
+No other dependencies need to be installed manually. Gradle downloads everything else.
 
 ---
 
-## 1 — Environment variables
+## Environment variables
 
-Create a `.env` file in the project root (it is gitignored and loaded automatically):
+The only required variable is `GEMINI_API_KEY`. How you provide it depends on how you run the server:
+
+| How you run | How to pass the key |
+|---|---|
+| Claude Desktop / Claude Code | `env` block in the MCP config (see below) — no `.env` file needed |
+| Terminal (`./gradlew bootRun`) | `.env` file in the project root, or `export` in your shell |
+
+**For terminal use only** — create a `.env` file in the project root (gitignored, loaded automatically):
 
 ```properties
 GEMINI_API_KEY=your-key-here
 ```
 
-`GEMINI_API_KEY` is the only required variable. It is used for semantic search at query time (not just ingestion). No other variables are needed — the pre-seeded data files are already included in the repo.
+Or export it in your shell:
 
-Or export the key in your shell before running.
+```bash
+export GEMINI_API_KEY=your-key-here
+```
+
+No other variables are needed. The pre-seeded data files are already included in the repo.
 
 ---
 
-## 2 — Connect to Claude Desktop
+## Run locally (standalone)
 
-No manual build step needed. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+No build step needed — Gradle handles compilation on first run:
+
+```bash
+./gradlew bootRun
+```
+
+The server starts and loads from the pre-seeded data files instantly. Check `logs/mcp.log` for:
+
+```
+Warm start: SQLite populated (750 tickets) and vectorstore.json loaded — no embedding calls.
+```
+
+The server is now an active STDIO process. It is meant to be managed by a Claude client (Desktop or Code), not invoked interactively.
+
+---
+
+## Connect to Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -69,31 +100,69 @@ No manual build step needed. Add to `~/Library/Application Support/Claude/claude
 }
 ```
 
-Replace `/absolute/path/to/repo` with the actual path where you cloned this repo.  
+Replace `/absolute/path/to/repo` with the actual path where you cloned this repo (e.g. `/Users/yourname/projects/mcp-customer-support-agent`).
+
 Restart Claude Desktop — `analyze_support_tickets` will appear in the tool list.
 
-**The repo ships with pre-seeded data** (`support.sqlite` + `vectorstore.json`, 750 tickets). The server loads from disk instantly on every start — no ingestion or CSV download needed. You will see this in `logs/mcp.log`:
-```
-Warm start: SQLite populated (750 tickets) and vectorstore.json loaded — no embedding calls.
+---
+
+## Connect to Claude Code (CLI)
+
+Add the server to your Claude Code MCP configuration:
+
+```bash
+claude mcp add cheq-support -- /absolute/path/to/repo/gradlew bootRun
 ```
 
-**Example prompts:**
-- *"What are the most common issues in the Technical Support queue?"*
-- *"Summarize billing complaints from German-speaking customers."*
-- *"Which app versions generate the most high-priority incidents?"*
+Or add it manually to `~/.claude/claude_code_config.json` (or `claude_desktop_config.json` — both formats are supported):
+
+```json
+{
+  "mcpServers": {
+    "cheq-support": {
+      "command": "/absolute/path/to/repo/gradlew",
+      "args": ["bootRun"],
+      "env": {
+        "GEMINI_API_KEY": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+Then use the tool in any Claude Code session:
+
+```
+> analyze_support_tickets("What are the most common issues in the Technical Support queue?")
+```
 
 ---
 
-## 3 — Run tests
+## Example prompts
 
-**Example prompts:**
 - *"What are the most common issues in the Technical Support queue?"*
 - *"Summarize billing complaints from German-speaking customers."*
 - *"Which app versions generate the most high-priority incidents?"*
+- *"How many open tickets are marked high priority, and what are the top themes?"*
 
 ---
 
-## 4 — Run tests
+## Pre-seeded data
+
+The repo ships with `src/main/resources/support.sqlite` (750 tickets, ~924 KB) and `src/main/resources/vectorstore.json` (750 × 2 embedded documents, ~61 MB). The server detects both files on startup and skips ingestion entirely — no Gemini API calls, no CSV needed, ready in under a second.
+
+To re-ingest from a different CSV, set these environment variables in `.env`:
+
+```properties
+DATASET_PATH=/path/to/your.csv
+INGEST_MAX_ROWS=1000
+```
+
+Then delete `src/main/resources/support.sqlite` and `src/main/resources/vectorstore.json` and restart. A cold start will re-embed and overwrite both files.
+
+---
+
+## Run tests
 
 ```bash
 ./gradlew test
@@ -109,10 +178,16 @@ Key test coverage:
 
 ## Logging
 
-All output goes to `logs/mcp.log` (rolling). **stdout is reserved for JSON-RPC frames** — no console appender is configured, which is required for STDIO MCP transport.
+All output goes to `logs/mcp.log` (rolling daily, 7-day retention). **stdout is reserved for JSON-RPC frames** — no console appender is configured, which is required for STDIO MCP transport.
+
+To tail logs while running:
+
+```bash
+tail -f logs/mcp.log
+```
 
 ---
 
 ## Scale-up path
 
-`SimpleVectorStore` scans all in-memory vectors then applies the `ticket_id IN (...)` metadata filter — correctness guarantee, not a performance optimization. To scale beyond ~10 k tickets, swap the `SimpleVectorStore` bean for `PgVectorStore` or `QdrantVectorStore`; the filter predicate pushes down as a true indexed pre-filter with no other code changes.
+`SimpleVectorStore` scans all in-memory vectors and applies the `ticket_id IN (...)` metadata filter — correctness guarantee, not a performance optimization. To scale beyond ~10k tickets, swap the `SimpleVectorStore` bean for `PgVectorStore` or `QdrantVectorStore`. The filter predicate pushes down as a true indexed pre-filter with no other code changes required.
