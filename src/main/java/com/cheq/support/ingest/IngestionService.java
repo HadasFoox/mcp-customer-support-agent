@@ -23,18 +23,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Offline ingestion phase. Runs once at startup ({@code @PostConstruct}) and is idempotent:
+ * Offline ingestion phase. Kicks off in a background thread at startup ({@code @PostConstruct})
+ * so the server process starts instantly and the MCP handshake completes before any embedding
+ * work begins. The {@link ReadinessGate} stays closed until ingestion finishes; the tool returns
+ * a "not ready" message if called before then.
  *
  * <ul>
- *   <li><b>Warm start</b> — if SQLite is already populated AND {@code vectorstore.json} exists,
- *       just load the vectors (no embedding API calls) and open the readiness gate.</li>
- *   <li><b>Cold start</b> — parse the capped CSV, write tickets to SQLite, embed each ticket's
- *       {@code body} and {@code answer} into the vector store (metadata {@code {ticket_id, field}}),
- *       persist to {@code vectorstore.json}, then open the readiness gate.</li>
+ *   <li><b>Warm start</b> — SQLite populated AND {@code vectorstore.json} exists → load vectors,
+ *       open gate. No embedding API calls; completes in under a second.</li>
+ *   <li><b>Cold start</b> — parse CSV, write SQLite, embed body+answer, save vectors, open gate.
+ *       Takes ~5–10 min on first run depending on embedding API latency.</li>
  * </ul>
  *
- * If the dataset is missing on a cold start, ingestion logs an error and leaves the gate closed,
- * so the tool reports "not ready" rather than serving empty results.
+ * If the dataset CSV is missing, ingestion logs an error and the gate stays closed.
  */
 @Component
 public class IngestionService {
@@ -70,6 +71,12 @@ public class IngestionService {
 
     @PostConstruct
     public void ingest() {
+        // Run in a background thread so the server starts instantly and the MCP
+        // handshake completes before any long-running embedding work begins.
+        Thread.ofVirtual().name("ingestion").start(this::doIngest);
+    }
+
+    void doIngest() {
         File vectorFile = new File(vectorStorePath);
 
         if (reader.isPopulated() && vectorFile.exists()) {
@@ -87,23 +94,27 @@ public class IngestionService {
             return; // gate stays closed
         }
 
-        writer.initSchema();
+        try {
+            writer.initSchema();
 
-        List<Ticket> tickets;
-        try (Reader r = Files.newBufferedReader(csv, StandardCharsets.UTF_8)) {
-            tickets = parser.parse(r, maxRows);
+            List<Ticket> tickets;
+            try (Reader r = Files.newBufferedReader(csv, StandardCharsets.UTF_8)) {
+                tickets = parser.parse(r, maxRows);
+            }
+            writer.insertBatch(tickets);
+
+            List<Document> documents = toDocuments(tickets);
+            vectorStore.add(documents);
+            vectorStore.save(vectorFile);
+
+            readiness.markReady();
+            log.info("Cold start complete: ingested {} tickets, embedded {} documents, saved to {}.",
+                    tickets.size(), documents.size(), vectorStorePath);
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to read dataset CSV at " + datasetPath, e);
+            log.error("Ingestion failed reading CSV at {}: {}", datasetPath, e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Ingestion failed (embedding or storage error): {}", e.getMessage(), e);
         }
-        writer.insertBatch(tickets);
-
-        List<Document> documents = toDocuments(tickets);
-        vectorStore.add(documents);
-        vectorStore.save(vectorFile);
-
-        readiness.markReady();
-        log.info("Cold start complete: ingested {} tickets, embedded {} documents, saved to {}.",
-                tickets.size(), documents.size(), vectorStorePath);
     }
 
     /** Two documents per ticket (body, answer); minimal metadata {ticket_id, field}. */

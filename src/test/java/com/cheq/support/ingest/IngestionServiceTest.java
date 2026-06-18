@@ -80,7 +80,7 @@ class IngestionServiceTest {
 
         IngestionService cold = new IngestionService(
                 parser, reader, writer, coldStore, coldGate, csv.toString(), vectorPath, 100);
-        cold.ingest();
+        cold.doIngest();
 
         assertThat(coldGate.isReady()).isTrue();
         assertThat(reader.count()).isEqualTo(3);                 // 3 tickets inserted
@@ -94,7 +94,7 @@ class IngestionServiceTest {
 
         IngestionService warm = new IngestionService(
                 parser, reader, writer, warmStore, warmGate, csv.toString(), vectorPath, 100);
-        warm.ingest();
+        warm.doIngest();
 
         assertThat(warmGate.isReady()).isTrue();
         assertThat(warmModel.embedCalls).isZero();               // idempotent: no re-embedding
@@ -111,7 +111,7 @@ class IngestionServiceTest {
                 dir.resolve("does-not-exist.csv").toString(),
                 dir.resolve("vectorstore.json").toString(), 100);
 
-        svc.ingest();
+        svc.doIngest();
 
         assertThat(gate.isReady()).isFalse(); // tool will report not-ready
     }
