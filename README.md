@@ -84,6 +84,8 @@ The server is now an active STDIO process. It is meant to be managed by a Claude
 
 ## Connect to Claude Desktop
 
+> **Clone location matters.** Some operating systems restrict apps from running executables inside protected folders (Desktop, Documents, Downloads). Clone this repo to an unrestricted path such as `~/projects/` or `~/Developer/` to avoid permission errors.
+
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
@@ -91,7 +93,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "cheq-support": {
       "command": "/absolute/path/to/repo/gradlew",
-      "args": ["bootRun"],
+      "args": ["--project-dir", "/absolute/path/to/repo", "-q", "bootRun"],
       "env": {
         "GEMINI_API_KEY": "your-key-here"
       }
@@ -111,7 +113,7 @@ Restart Claude Desktop — `analyze_support_tickets` will appear in the tool lis
 Add the server to your Claude Code MCP configuration:
 
 ```bash
-claude mcp add cheq-support -- /absolute/path/to/repo/gradlew bootRun
+claude mcp add cheq-support -- /absolute/path/to/repo/gradlew --project-dir /absolute/path/to/repo -q bootRun
 ```
 
 Or add it manually to `~/.claude/claude_code_config.json` (or `claude_desktop_config.json` — both formats are supported):
@@ -121,7 +123,7 @@ Or add it manually to `~/.claude/claude_code_config.json` (or `claude_desktop_co
   "mcpServers": {
     "cheq-support": {
       "command": "/absolute/path/to/repo/gradlew",
-      "args": ["bootRun"],
+      "args": ["--project-dir", "/absolute/path/to/repo", "-q", "bootRun"],
       "env": {
         "GEMINI_API_KEY": "your-key-here"
       }
